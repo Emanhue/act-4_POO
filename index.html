@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventario POO</title>
+<style>
+  :root {
+    --fondo: #f3f5f1;
+    --papel: #ffffff;
+    --tinta: #1d2b2a;
+    --tinta-suave: #5b6b68;
+    --verde: #0f5c5a;
+    --mostaza: #d9a21b;
+    --linea: #cfd8d3;
+    --peligro: #b3412f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  header { background: var(--verde); color: #fff; padding: 1.5rem 1rem; }
+  header h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.9rem; font-weight: 700; }
+  header p { margin: .25rem 0 0; opacity: .85; }
+  main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; display: grid; gap: 1.25rem; }
+
+  .resumen { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .dato { background: var(--papel); border: 1px solid var(--linea); border-left: 5px solid var(--mostaza); padding: .75rem 1rem; min-width: 190px; }
+  .dato span { display: block; color: var(--tinta-suave); font-size: .85rem; }
+  .dato strong { font-family: Georgia, serif; font-size: 1.5rem; }
+
+  section { background: var(--papel); border: 1px solid var(--linea); padding: 1.25rem; }
+  h2 { margin: 0 0 1rem; font-family: Georgia, serif; font-size: 1.25rem; }
+
+  form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .9rem; align-items: end; }
+  label { display: grid; gap: .25rem; font-size: .9rem; font-weight: 600; }
+  input, select { font: inherit; padding: .55rem .6rem; border: 1px solid var(--linea); background: #fff; color: var(--tinta); }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid var(--mostaza); outline-offset: 1px; }
+  button { font: inherit; font-weight: 600; cursor: pointer; padding: .6rem 1rem; border: 0; background: var(--verde); color: #fff; }
+  button:hover { background: #0a4846; }
+  button.eliminar { background: transparent; color: var(--peligro); border: 1px solid var(--peligro); padding: .3rem .6rem; font-size: .85rem; }
+  button.eliminar:hover { background: var(--peligro); color: #fff; }
+  .mensaje { grid-column: 1 / -1; min-height: 1.4rem; margin: 0; font-size: .92rem; }
+  .mensaje.error { color: var(--peligro); }
+  .mensaje.ok { color: var(--verde); }
+
+  .barra { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+  .barra h2 { margin: 0; }
+  .barra input { min-width: 240px; }
+
+  .tabla-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th, td { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  th { font-size: .85rem; color: var(--tinta-suave); border-bottom: 2px solid var(--tinta); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .etiqueta { display: inline-block; padding: 0 .5rem; font-size: .8rem; border: 1px solid var(--linea); }
+  .etiqueta.perecedero { border-color: var(--mostaza); background: #fbf2d6; }
+  .etiqueta.electronico { border-color: var(--verde); background: #dcefee; }
+  .alerta { color: var(--peligro); font-weight: 600; }
+  .vacio { text-align: center; color: var(--tinta-suave); padding: 2rem 1rem; }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Inventario de la tienda</h1>
+  <p>Registra productos, busca y revisa el precio final con impuestos y reglas de cada tipo.</p>
+</header>
+
+<main>
+  <div class="resumen" aria-live="polite">
+    <div class="dato"><span>Productos registrados</span><strong id="totalProductos">0</strong></div>
+    <div class="dato"><span>Valor del inventario (precio final)</span><strong id="valorTotal">$ 0</strong></div>
+  </div>
+
+  <section>
+    <h2>Agregar producto</h2>
+    <form id="formProducto" novalidate>
+      <label>Tipo
+        <select id="tipo">
+          <option value="general">General</option>
+          <option value="perecedero">Perecedero</option>
+          <option value="electronico">Electrónico</option>
+        </select>
+      </label>
+      <label>Nombre
+        <input id="nombre" type="text" maxlength="60" placeholder="Ej: Leche entera 1 L">
+      </label>
+      <label>Precio base (COP)
+        <input id="precio" type="number" min="0" step="50" placeholder="4500">
+      </label>
+      <label>Cantidad
+        <input id="cantidad" type="number" min="0" step="1" placeholder="20">
+      </label>
+      <label id="campoVencimiento" class="oculto">Fecha de vencimiento
+        <input id="vencimiento" type="date">
+      </label>
+      <label id="campoGarantia" class="oculto">Garantía (meses)
+        <input id="garantia" type="number" min="0" step="1" placeholder="12">
+      </label>
+      <button type="submit">Agregar al inventario</button>
+      <p id="mensaje" class="mensaje" role="status"></p>
+    </form>
+  </section>
+
+  <section>
+    <div class="barra">
+      <h2>Productos</h2>
+      <input id="buscar" type="search" placeholder="Buscar por nombre o tipo" aria-label="Buscar productos">
+    </div>
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Tipo</th>
+            <th>Detalle</th>
+            <th class="num">Cant.</th>
+            <th class="num">Precio base</th>
+            <th class="num">Precio final</th>
+            <th><span class="oculto">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody id="cuerpoTabla"></tbody>
+      </table>
+    </div>
+    <p id="vacio" class="vacio oculto">No hay productos que mostrar. Agrega uno con el formulario.</p>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   CLASE 1 (BASE): Producto
+   - Encapsulamiento: los atributos son privados (#) y se acceden con
+     getters/setters que validan los datos.
+   - Define el método calcularPrecioFinal() que las subclases sobrescriben.
+   ===================================================================== */
+class Producto {
+  static IVA = 0.19;          // atributo estático: impuesto común a todos
+  static #contador = 0;       // privado: genera ids únicos
+
+  #id;
+  #nombre;
+  #precio;
+  #cantidad;
+
+  constructor(nombre, precio, cantidad) {
+    this.#id = ++Producto.#contador;
+    this.nombre = nombre;     // usa los setters (validan)
+    this.precio = precio;
+    this.cantidad = cantidad;
+  }
+
+  get id() { return this.#id; }
+  get nombre() { return this.#nombre; }
+  get precio() { return this.#precio; }
+  get cantidad() { return this.#cantidad; }
+
+  set nombre(valor) {
+    const limpio = String(valor ?? "").trim();
+    if (limpio.length < 2) throw new Error("El nombre debe tener al menos 2 caracteres.");
+    this.#nombre = limpio;
+  }
+  set precio(valor) {
+    const n = Number(valor);
+    if (!Number.isFinite(n) || n <= 0) throw new Error("El precio debe ser un número mayor que 0.");
+    this.#precio = n;
+  }
+  set cantidad(valor) {
+    const n = Number(valor);
+    if (!Number.isInteger(n) || n < 0) throw new Error("La cantidad debe ser un entero de 0 o más.");
+    this.#cantidad = n;
+  }
+
+  /** Nombre del tipo, para mostrar en la tabla. Las subclases lo sobrescriben. */
+  get tipo() { return "General"; }
+  get claveTipo() { return "general"; }
+
+  /** Precio de venta: precio base + IVA. Las subclases lo sobrescriben (polimorfismo). */
+  calcularPrecioFinal() {
+    return this.precio * (1 + Producto.IVA);
+  }
+
+  /** Texto con datos propios de cada tipo. Las subclases lo sobrescriben. */
+  detalle() {
+    return "Sin datos adicionales";
+  }
+
+  /** Indica si el producto requiere una alerta visual. */
+  tieneAlerta() { return false; }
+
+  /** Valor total de las unidades en bodega. */
+  valorEnInventario() {
+    return this.calcularPrecioFinal() * this.cantidad;
+  }
+
+  coincideCon(texto) {
+    const t = texto.toLowerCase();
+    return this.nombre.toLowerCase().includes(t) || this.tipo.toLowerCase().includes(t);
+  }
+
+  /** Convierte el objeto a datos simples para guardarlo. */
+  aDatos() {
+    return { tipo: this.claveTipo, nombre: this.nombre, precio: this.precio, cantidad: this.cantidad };
+  }
+}
+
+/* =====================================================================
+   CLASE 2 (HERENCIA): ProductoPerecedero extends Producto
+   - Agrega la fecha de vencimiento.
+   - Sobrescribe calcularPrecioFinal(): descuento si está por vencer.
+   ===================================================================== */
+class ProductoPerecedero extends Producto {
+  #vencimiento; // Date
+
+  constructor(nombre, precio, cantidad, fechaISO) {
+    super(nombre, precio, cantidad);
+    this.vencimiento = fechaISO;
+  }
+
+  get vencimiento() { return this.#vencimiento; }
+  set vencimiento(fechaISO) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaISO ?? "");
+    if (!m) throw new Error("Indica una fecha de vencimiento válida.");
+    this.#vencimiento = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+
+  get tipo() { return "Perecedero"; }
+  get claveTipo() { return "perecedero"; }
+
+  diasParaVencer() {
+    const hoy = new Date();
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    return Math.round((this.#vencimiento - inicioHoy) / 86400000);
+  }
+
+  estaVencido() { return this.diasParaVencer() < 0; }
+
+  // Polimorfismo: misma firma, comportamiento distinto.
+  calcularPrecioFinal() {
+    if (this.estaVencido()) return 0;                       // no se puede vender
+    const base = super.calcularPrecioFinal();               // reutiliza la lógica del padre
+    return this.diasParaVencer() <= 3 ? base * 0.7 : base;  // 30 % de descuento si vence pronto
+  }
+
+  detalle() {
+    const dias = this.diasParaVencer();
+    const fecha = this.#vencimiento.toLocaleDateString("es-CO");
+    if (dias < 0) return `Vencido el ${fecha}`;
+    if (dias <= 3) return `Vence el ${fecha} (30 % de descuento)`;
+    return `Vence el ${fecha}`;
+  }
+
+  tieneAlerta() { return this.diasParaVencer() <= 3; }
+
+  aDatos() {
+    const d = this.#vencimiento;
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { ...super.aDatos(), vencimiento: iso };
+  }
+}
+
+/* =====================================================================
+   CLASE 3 (HERENCIA): ProductoElectronico extends Producto
+   - Agrega los meses de garantía.
+   - Sobrescribe calcularPrecioFinal(): recargo por garantía extendida.
+   ===================================================================== */
+class ProductoElectronico extends Producto {
+  #garantiaMeses;
+
+  constructor(nombre, precio, cantidad, garantiaMeses) {
+    super(nombre, precio, cantidad);
+    this.garantiaMeses = garantiaMeses;
+  }
+
+  get garantiaMeses() { return this.#garantiaMeses; }
+  set garantiaMeses(valor) {
+    const n = Number(valor);
+    if (!Number.isInteger(n) || n < 0) throw new Error("La garantía debe ser un entero de 0 o más meses.");
+    this.#garantiaMeses = n;
+  }
+
+  get tipo() { return "Electrónico"; }
+  get claveTipo() { return "electronico"; }
+
+  // Polimorfismo: 3 % extra por cada 12 meses de garantía.
+  calcularPrecioFinal() {
+    return super.calcularPrecioFinal() * (1 + 0.03 * (this.#garantiaMeses / 12));
+  }
+
+  detalle() {
+    return `Garantía de ${this.#garantiaMeses} ${this.#garantiaMeses === 1 ? "mes" : "meses"}`;
+  }
+
+  aDatos() {
+    return { ...super.aDatos(), garantia: this.#garantiaMeses };
+  }
+}
+
+/* =====================================================================
+   CLASE 4: Inventario
+   - Administra una colección de productos (agregar, eliminar, buscar).
+   - No sabe nada de la interfaz: solo maneja los datos.
+   - Trabaja con Producto sin importar su subclase (polimorfismo).
+   ===================================================================== */
+class Inventario {
+  #productos = [];
+  #claveAlmacen = "inventario-poo";
+
+  agregar(producto) {
+    if (!(producto instanceof Producto)) throw new Error("Solo se pueden agregar productos.");
+    this.#productos.push(producto);
+    this.guardar();
+  }
+
+  eliminar(id) {
+    this.#productos = this.#productos.filter(p => p.id !== id);
+    this.guardar();
+  }
+
+  buscar(texto = "") {
+    const t = texto.trim();
+    return t === "" ? [...this.#productos] : this.#productos.filter(p => p.coincideCon(t));
+  }
+
+  get total() { return this.#productos.length; }
+
+  valorTotal() {
+    return this.#productos.reduce((suma, p) => suma + p.valorEnInventario(), 0);
+  }
+
+  /** Fábrica: crea el objeto del tipo correcto a partir de datos simples. */
+  static crearProducto(d) {
+    switch (d.tipo) {
+      case "perecedero":  return new ProductoPerecedero(d.nombre, d.precio, d.cantidad, d.vencimiento);
+      case "electronico": return new ProductoElectronico(d.nombre, d.precio, d.cantidad, d.garantia);
+      default:            return new Producto(d.nombre, d.precio, d.cantidad);
+    }
+  }
+
+  guardar() {
+    try {
+      localStorage.setItem(this.#claveAlmacen, JSON.stringify(this.#productos.map(p => p.aDatos())));
+    } catch (e) { /* si el navegador no permite guardar, la app sigue funcionando en memoria */ }
+  }
+
+  cargar() {
+    try {
+      const texto = localStorage.getItem(this.#claveAlmacen);
+      if (!texto) return false;
+      JSON.parse(texto).forEach(d => this.#productos.push(Inventario.crearProducto(d)));
+      return true;
+    } catch (e) {
+      this.#productos = [];
+      return false;
+    }
+  }
+}
+
+/* =====================================================================
+   CLASE PRINCIPAL: Aplicacion
+   - Controla el flujo: arranca la app, conecta la interfaz (DOM)
+     con la lógica (Inventario) y reacciona a los eventos del usuario.
+   ===================================================================== */
+class Aplicacion {
+  #inventario;
+  #el = {};
+  #formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+
+  constructor(inventario) {
+    this.#inventario = inventario;
+  }
+
+  iniciar() {
+    const ids = ["formProducto", "tipo", "nombre", "precio", "cantidad", "vencimiento", "garantia",
+                 "campoVencimiento", "campoGarantia", "mensaje", "buscar", "cuerpoTabla", "vacio",
+                 "totalProductos", "valorTotal"];
+    ids.forEach(id => { this.#el[id] = document.getElementById(id); });
+
+    if (!this.#inventario.cargar()) this.#cargarEjemplos();
+
+    this.#el.formProducto.addEventListener("submit", e => { e.preventDefault(); this.#agregarDesdeFormulario(); });
+    this.#el.tipo.addEventListener("change", () => this.#mostrarCamposDelTipo());
+    this.#el.buscar.addEventListener("input", () => this.#pintarTabla());
+    this.#el.cuerpoTabla.addEventListener("click", e => {
+      const boton = e.target.closest("button[data-id]");
+      if (boton) this.#eliminar(Number(boton.dataset.id));
+    });
+
+    this.#mostrarCamposDelTipo();
+    this.#pintarTodo();
+  }
+
+  #cargarEjemplos() {
+    const en = dias => {
+      const f = new Date(); f.setDate(f.getDate() + dias);
+      return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+    };
+    [
+      { tipo: "general", nombre: "Cuaderno cuadriculado", precio: 6500, cantidad: 40 },
+      { tipo: "perecedero", nombre: "Leche entera 1 L", precio: 4500, cantidad: 25, vencimiento: en(2) },
+      { tipo: "perecedero", nombre: "Queso campesino", precio: 12000, cantidad: 10, vencimiento: en(15) },
+      { tipo: "electronico", nombre: "Audífonos Bluetooth", precio: 85000, cantidad: 8, garantia: 12 }
+    ].forEach(d => this.#inventario.agregar(Inventario.crearProducto(d)));
+  }
+
+  #mostrarCamposDelTipo() {
+    const tipo = this.#el.tipo.value;
+    this.#el.campoVencimiento.classList.toggle("oculto", tipo !== "perecedero");
+    this.#el.campoGarantia.classList.toggle("oculto", tipo !== "electronico");
+  }
+
+  #agregarDesdeFormulario() {
+    const tipo = this.#el.tipo.value;
+    const datos = {
+      tipo,
+      nombre: this.#el.nombre.value,
+      precio: this.#el.precio.value,
+      cantidad: this.#el.cantidad.value,
+      vencimiento: this.#el.vencimiento.value,
+      garantia: this.#el.garantia.value
+    };
+    try {
+      this.#inventario.agregar(Inventario.crearProducto(datos));
+      this.#el.formProducto.reset();
+      this.#el.tipo.value = tipo;
+      this.#mostrarCamposDelTipo();
+      this.#mensaje("Producto agregado.", "ok");
+      this.#pintarTodo();
+      this.#el.nombre.focus();
+    } catch (error) {
+      this.#mensaje(error.message, "error");
+    }
+  }
+
+  #eliminar(id) {
+    this.#inventario.eliminar(id);
+    this.#mensaje("Producto eliminado.", "ok");
+    this.#pintarTodo();
+  }
+
+  #mensaje(texto, clase) {
+    this.#el.mensaje.textContent = texto;
+    this.#el.mensaje.className = `mensaje ${clase}`;
+  }
+
+  #pintarTodo() {
+    this.#pintarResumen();
+    this.#pintarTabla();
+  }
+
+  #pintarResumen() {
+    this.#el.totalProductos.textContent = this.#inventario.total;
+    this.#el.valorTotal.textContent = this.#formatoMoneda.format(this.#inventario.valorTotal());
+  }
+
+  #pintarTabla() {
+    const productos = this.#inventario.buscar(this.#el.buscar.value);
+    const cuerpo = this.#el.cuerpoTabla;
+    cuerpo.replaceChildren();
+
+    this.#el.vacio.classList.toggle("oculto", productos.length > 0);
+
+    for (const p of productos) {
+      const fila = document.createElement("tr");
+
+      const celda = (texto, clase) => {
+        const td = document.createElement("td");
+        td.textContent = texto;
+        if (clase) td.className = clase;
+        fila.appendChild(td);
+        return td;
+      };
+
+      celda(p.nombre);
+
+      const tdTipo = document.createElement("td");
+      const etiqueta = document.createElement("span");
+      etiqueta.className = `etiqueta ${p.claveTipo}`;
+      etiqueta.textContent = p.tipo;
+      tdTipo.appendChild(etiqueta);
+      fila.appendChild(tdTipo);
+
+      // Polimorfismo en acción: detalle() y calcularPrecioFinal() se comportan
+      // distinto según la clase real de cada objeto.
+      const tdDetalle = celda(p.detalle(), p.tieneAlerta() ? "alerta" : "");
+      tdDetalle.title = p.tieneAlerta() ? "Requiere atención" : "";
+
+      celda(p.cantidad, "num");
+      celda(this.#formatoMoneda.format(p.precio), "num");
+      celda(this.#formatoMoneda.format(p.calcularPrecioFinal()), "num");
+
+      const tdAccion = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "eliminar";
+      btn.dataset.id = p.id;
+      btn.textContent = "Eliminar";
+      btn.setAttribute("aria-label", `Eliminar ${p.nombre}`);
+      tdAccion.appendChild(btn);
+      fila.appendChild(tdAccion);
+
+      cuerpo.appendChild(fila);
+    }
+  }
+}
+
+/* Punto de entrada */
+document.addEventListener("DOMContentLoaded", () => {
+  new Aplicacion(new Inventario()).iniciar();
+});
+</script>
+</body>
+</html>
